@@ -1,0 +1,26 @@
+[
+    {
+      "name": "Confused developer",
+      "llm": "ChatGPT",
+      "engagement": 0.7,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "Tired Dev Ops Engineer",
+      "llm": "ChatGPT",
+      "engagement": 0.8,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "Modular Monolith architect",
+      "llm": "Gemini",
+      "engagement": 0.6,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "microservice architect",
+      "llm": "ChatGPT",
+      "engagement": 0.6,
+      "model": "gpt-3.5-turbo"
+    }
+]

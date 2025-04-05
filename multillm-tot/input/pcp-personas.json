@@ -1,0 +1,32 @@
+[
+    {
+      "name": "primary care physician",
+      "llm": "ChatGPT",
+      "engagement": 0.7,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "ai health tech startup founder",
+      "llm": "ChatGPT",
+      "engagement": 0.8,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "regulators",
+      "llm": "Gemini",
+      "engagement": 0.6,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "health insurance executive",
+      "llm": "Deepseek",
+      "engagement": 0.4,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "hospital administrator",
+      "llm": "ChatGPT",
+      "engagement": 0.6,
+      "model": "gpt-3.5-turbo"
+    }
+]

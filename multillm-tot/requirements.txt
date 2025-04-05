@@ -3,5 +3,9 @@ openai>=1.0.0
 click>=8.1.0
 rich>=13.0.0
 
+
 # Optional: used for output formatting, data inspection, or future enhancements
 pandas>=1.5.0
+
+# Validation
+jsonschema>=4.0.0

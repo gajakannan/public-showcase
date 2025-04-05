@@ -1,0 +1,26 @@
+[
+    {
+      "name": "html developer",
+      "llm": "ChatGPT",
+      "engagement": 0.7,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "react developer",
+      "llm": "ChatGPT",
+      "engagement": 0.8,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "astrojs developer",
+      "llm": "Gemini",
+      "engagement": 0.6,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "angular developer",
+      "llm": "Deepseek",
+      "engagement": 0.4,
+      "model": "gpt-3.5-turbo"
+    }
+]

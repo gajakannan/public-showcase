@@ -1,14 +1,18 @@
 import json
 import random
-import os
 import click
 from rich import print
-from openai import OpenAI
 from datetime import datetime
 from collections import defaultdict
+from jsonschema import validate, ValidationError
+from init import get_openai_client, load_persona_schema
 
-# Initialize OpenAI client (uses OPENAI_API_KEY env var)
-client = OpenAI()
+# # Initialize OpenAI client (uses OPENAI_API_KEY env var)
+# client = OpenAI()
+
+# # Load the schema once (assuming it's in the same directory or known path)
+# with open("persona.schema.json", "r", encoding="utf-8") as schema_file:
+#     PERSONA_SCHEMA = json.load(schema_file)
 
 COLOR_PALETTE = [
     "#f97316",  # vibrant orange
@@ -37,15 +41,20 @@ def assign_colors_to_personas(personas):
 # -----------------------------
 # Function: Parse Personas JSON
 # -----------------------------
-def parse_personas(personas_json: str):
+def parse_personas(personas: list, schema):
     try:
-        personas = json.loads(personas_json)
-        for p in personas:
+        if not isinstance(personas, list):
+            raise ValueError("Personas file must contain a JSON array.")
+        for i, p in enumerate(personas):
+            validate(instance=p, schema=schema)
             p.setdefault("engagement", 0.7)
-        assert isinstance(personas, list)
         return personas
+
+    except ValidationError as ve:
+        raise click.BadParameter(f"Schema validation error in persona {i + 1}: {ve.message}")
     except Exception as e:
-        raise click.BadParameter(f"Invalid personas JSON: {e}")
+        raise click.BadParameter(f"Invalid personas structure: {e}")
+
 
 # -----------------------------
 # Function: Initialize State
@@ -85,13 +94,14 @@ def get_thread_context(state, message):
 # -----------------------------
 # Function: Get Real LLM Reply (OpenAI)
 # -----------------------------
-def simulate_reply(persona, target_text, round_num):
+def agent_reply(persona, target_text, round_num, client):
     system_prompt = f"You are a {persona['name']}. Provide thoughtful insights on the following:"
     user_prompt = target_text
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            # model="gpt-3.5-turbo",
+            model=persona.get("model", "gpt-3.5-turbo"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -108,7 +118,7 @@ def simulate_reply(persona, target_text, round_num):
 # -----------------------------
 # Function: Run the Conversation
 # -----------------------------
-def run_conversation(state):
+def run_conversation(state, client):
     state["runtime_log"] = []
     def log_line(line):
         state["runtime_log"].append(line)
@@ -134,7 +144,7 @@ def run_conversation(state):
 
             parent_id = None if isinstance(target, str) else target["id"]
 
-            reply_text = simulate_reply(persona, target_text, state["currentRound"])
+            reply_text = agent_reply(persona, target_text, state["currentRound"], client)
             message_id = f"msg-{state['currentRound']}-{persona['name']}"
 
             state["conversationHistory"].append({
@@ -394,7 +404,7 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
         </details>
 
         <details>
-        <summary>📜 Runtime Log</summary>
+        <summary>📜 Run Log</summary>
         <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
         </details>
         </div>
@@ -451,20 +461,27 @@ def format_json_tree_pretty(messages, level=0):
 @click.command()
 @click.option('--prompt', required=True, help='The central discussion prompt')
 @click.option('--rounds', default=3, help='Number of conversation rounds')
-@click.option('--personas', required=True, help='JSON array of persona objects')
+# @click.option('--personas', required=True, help='JSON array of persona objects')
+@click.option('--personas-file', required=True, type=click.Path(exists=True), help='Path to a JSON file containing persona definitions')
 @click.option('--save-to', default=None, help='Optional filename to save the final output')
 @click.option('--output', default='markdown', type=click.Choice(['markdown', 'json', 'html', 'tree']), help='Output format')
-def run_cli(prompt, rounds, personas, output, save_to):
-    parsed_personas = parse_personas(personas)
+def run_cli(prompt, rounds, personas_file, output, save_to):
+    schema = load_persona_schema()
+    client = get_openai_client()
+    # parsed_personas = parse_personas(personas)
+    with open(personas_file, 'r', encoding='utf-8') as f:
+        personas = json.load(f)
+    parsed_personas = parse_personas(personas, schema)
     state = initialize_state(prompt, rounds, parsed_personas)
-    state["generatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    cli_command = f"python main.py --prompt \"{prompt}\" --rounds {rounds} --personas '{personas}' --output {output}"
+    state["generatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cli_command = f"python main.py --prompt \"{prompt}\" --rounds {rounds} --personas-file '{personas_file}' --output {output}"
+
     if save_to:
         cli_command += f" --save-to \"{save_to}\""
     state["cli_command"] = cli_command
 
-    run_conversation(state)
+    run_conversation(state, client)
     thread_tree = build_thread_tree(state["conversationHistory"])
 
     if output == 'markdown':
