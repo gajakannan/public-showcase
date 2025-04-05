@@ -396,19 +396,63 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
     html += "</ul></details></div>"
 
     # Add CLI + Runtime Log
+    # html += f"""
+    #     <div class="extra-meta">
+    #     <details open>
+    #     <summary>💻 CLI Command</summary>
+    #     <pre><code>{state['cli_command']}</code></pre>
+    #     </details>
+
+    #     <details>
+    #     <summary>📜 Run Log</summary>
+    #     <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
+    #     </details>
+    #     </div>
+    #     """
+
     html += f"""
         <div class="extra-meta">
+
         <details open>
         <summary>💻 CLI Command</summary>
-        <pre><code>{state['cli_command']}</code></pre>
+        <div style="background-color: #1e293b; border-radius: 6px; padding: 0.5em 0.75em; margin-bottom: 1em;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25em;">
+            <span style="color: #f1f5f9; font-size: 0.9em;">Copy this command:</span>
+            <button onclick="copyToClipboard('cli-command')" style="background-color: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">📋 Copy</button>
+            </div>
+            <pre style="margin: 0;"><code id="cli-command" style="color: #f1f5f9;">{state['cli_command']}</code></pre>
+        </div>
         </details>
 
         <details>
         <summary>📜 Run Log</summary>
         <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
         </details>
+
         </div>
+
+        <script>
+        function copyToClipboard(id) {{
+            const text = document.getElementById(id).innerText;
+            const button = event.target;
+
+            navigator.clipboard.writeText(text).then(() => {{
+            const originalText = button.innerText;
+            button.innerText = "✅ Copied";
+            button.disabled = true;
+
+            setTimeout(() => {{
+                button.innerText = originalText;
+                button.disabled = false;
+            }}, 2000);
+            }}).catch(err => {{
+            alert("Failed to copy: " + err);
+            }});
+        }}
+        </script>
+
         """
+
 
     html += "</body></html>"
     return html
