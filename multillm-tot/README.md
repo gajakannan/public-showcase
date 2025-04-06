@@ -52,7 +52,7 @@ Run a 5-round discussion about frontend frameworks:
 
 ```bash
 python main.py \
-  --prompt "Which is the good front end technology to develop web applications" \
+  --prompt "You all work for Acme corp, and discussing about next big web application and tool set to use for that application" \
   --rounds 5 \
   --personas-file "./input/frontend-personas.json" \
   --output html \
@@ -85,7 +85,7 @@ Windows PowerShell equivalents:
 
 ```powershell
 python main.py `
-  --prompt "Which is the good front end technology to develop web applications" `
+  --prompt "You all work for Acme corp, and discussing about next big web application and tool set to use for that application" `
   --rounds 5 `
   --personas-file "./input/frontend-personas.json" `
   --output html `
