@@ -1,0 +1,20 @@
+**/.venv/
+**/.venv/**
+
+# output folder where we generate html file
+**/output/
+**/output/**
+
+# compiled python files
+**/__pycache__/
+**/__pycache__/**
+**/*.py[cod]
+
+# test output and cache
+**/.pytest_cache/
+**/.pytest_cache/**
+
+# Type checking
+**/.mypy_cache/
+**/.mypy_cache/**
+
