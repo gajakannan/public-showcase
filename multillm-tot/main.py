@@ -6,13 +6,9 @@ from datetime import datetime
 from collections import defaultdict
 from jsonschema import validate, ValidationError
 from init import get_openai_client, load_persona_schema
+from persona_utils import enrich_personas_with_file_references
+# from file_utils import load_file_reference
 
-# # Initialize OpenAI client (uses OPENAI_API_KEY env var)
-# client = OpenAI()
-
-# # Load the schema once (assuming it's in the same directory or known path)
-# with open("persona.schema.json", "r", encoding="utf-8") as schema_file:
-#     PERSONA_SCHEMA = json.load(schema_file)
 
 COLOR_PALETTE = [
     "#f97316",  # vibrant orange
@@ -98,6 +94,22 @@ def agent_reply(persona, target_text, round_num, client):
     system_prompt = f"You are a {persona['name']}. Provide thoughtful insights on the following:"
     user_prompt = target_text
 
+    # Inject preloaded file references if available
+    preloaded_refs = persona.get("resolved_file_references", [])
+    if preloaded_refs:
+        ref_texts = [
+            f"[File: {ref['path']}]\n\n{ref['content']}" for ref in preloaded_refs
+        ]
+        if ref_texts:
+            user_prompt = (
+                "The following content is provided as reference for your persona. "
+                "Use it to inform your response:\n\n"
+                + "\n\n".join(ref_texts)
+                + "\n\n"
+                + user_prompt
+            )
+        # user_prompt = "\n\n".join(ref_texts) + "\n\n" + user_prompt
+
     try:
         response = client.chat.completions.create(
             # model="gpt-3.5-turbo",
@@ -118,8 +130,9 @@ def agent_reply(persona, target_text, round_num, client):
 # -----------------------------
 # Function: Run the Conversation
 # -----------------------------
-def run_conversation(state, client):
+def run_conversation(state, client, goal_round="optional"):
     state["runtime_log"] = []
+
     def log_line(line):
         state["runtime_log"].append(line)
         print(line)
@@ -158,6 +171,41 @@ def run_conversation(state, client):
             })
 
             # print(f"[green]{persona['name']} replied → {message_id}[/green]")
+            log_line(f"{persona['name']} replied → {message_id}")
+
+        state["currentRound"] += 1
+
+    # Goal round handling (only once, after all normal rounds)
+    if goal_round != "optional":
+        log_line(f"[bold magenta]--- Goal Round: {goal_round.upper()} ---[/bold magenta]")
+
+        # target_text = build_goal_prompt(goal_round, state)
+        full_history = flatten_conversation_history_with_threads(state)
+        target_text = (
+            "Here is the full conversation so far:\n\n"
+            + full_history
+            + "\n\n"
+            + build_goal_prompt(goal_round, state)
+        )
+
+        parent_id = None
+
+        for persona in state["personas"]:
+            log_line(f"{persona['name']} is participating in the goal round.")
+
+            reply_text = agent_reply(persona, target_text, state["currentRound"], client)
+            message_id = f"msg-{state['currentRound']}-{persona['name']}"
+
+            state["conversationHistory"].append({
+                "id": message_id,
+                "round": "Goal - " + goal_round,
+                "persona": persona["name"],
+                "llm": persona["llm"],
+                "parentId": parent_id,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "text": reply_text
+            })
+
             log_line(f"{persona['name']} replied → {message_id}")
 
         state["currentRound"] += 1
@@ -300,6 +348,11 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
                     font-size: 0.8em;
                     margin-left: 10px;
                 }}
+                .goal-badge {{
+                    background-color: #9333ea; /* purple */
+                    color: white;
+
+                }}
                 .timestamp-badge {{
                     font-size: 0.75em;
                     color: #cbd5e1;  /* slate-300 */
@@ -366,13 +419,25 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
         </div>
         """
 
+    def get_round_class(round_value):
+        base = "round-badge"
+        if isinstance(round_value, str) and round_value.lower().startswith("goal"):
+            return base + " goal-badge"
+        return base
+
+    def format_round_label(round_value):
+        if isinstance(round_value, str) and round_value.lower().startswith("goal"):
+            return f"🟣 {round_value}"
+        return f"Round {round_value}"
+
+
     def render_node(node):
         color = persona_colors.get(node["persona"], "#000")
         content = f"""
             <details open>
                 <summary>
                     <span class="persona" style="color: {color};">{node['persona']}</span>
-                    <span class="round-badge">Round {node['round']}</span>
+                    <span class="{get_round_class(node['round'])}">{format_round_label(node['round'])}</span>
                     <span class="timestamp-badge">{node['timestamp']}</span>
                 </summary>
                 <div class="message">{node['text']}</div>
@@ -382,8 +447,26 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
         content += "</details>\n"
         return content
 
-    for top_node in tree:
-        html += render_node(top_node)
+    # Split normal vs goal nodes
+    normal_nodes = [n for n in tree if not (isinstance(n["round"], str) and n["round"].lower().startswith("goal"))]
+    goal_nodes = [n for n in tree if isinstance(n["round"], str) and n["round"].lower().startswith("goal")]
+
+    # Render normal discussion first
+    for node in normal_nodes:
+        html += render_node(node)
+
+    # Render grouped goal section (if any)
+    if goal_nodes:
+        html += "<h2 style='margin-top: 0.5em; color: #9333ea;'>🟣 Goal Round</h2>\n"
+        for node in goal_nodes:
+            html += render_node(node)
+
+    # for top_node in tree:
+    #     is_goal = isinstance(top_node["round"], str) and top_node["round"].lower().startswith("goal")
+
+    #     if is_goal:
+    #         html += f"<h2 style='margin-top: 2em; color: #9333ea;'>🟣 {top_node['round']}</h2>"
+    #     html += render_node(top_node)
 
     # Summary section at the bottom
     html += """
@@ -395,20 +478,6 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
         html += f"<li>{line}</li>\n"
     html += "</ul></details></div>"
 
-    # Add CLI + Runtime Log
-    # html += f"""
-    #     <div class="extra-meta">
-    #     <details open>
-    #     <summary>💻 CLI Command</summary>
-    #     <pre><code>{state['cli_command']}</code></pre>
-    #     </details>
-
-    #     <details>
-    #     <summary>📜 Run Log</summary>
-    #     <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
-    #     </details>
-    #     </div>
-    #     """
 
     html += f"""
         <div class="extra-meta">
@@ -469,12 +538,13 @@ def summarize_engagement(conversation, personas, total_rounds):
         per_round[msg["round"]].add(msg["persona"])
         per_persona[msg["persona"]] += 1
 
+    # Use safe sort for rounds with int + str
     round_summary = [
-        f"Round {rnd}: {len(personas)} responded"
-        for rnd, personas in sorted(per_round.items())
+        f"{'Round ' + str(rnd) if isinstance(rnd, int) else rnd}: {len(personas)} responded"
+        for rnd, personas in sorted(per_round.items(), key=lambda x: (0, x[0]) if isinstance(x[0], int) else (1, str(x[0])))
     ]
 
-    # Create a lookup map of persona -> engagement
+    # Correctly summarize by persona
     engagement_lookup = {p["name"]: p.get("engagement", 0.7) for p in personas}
 
     persona_summary = [
@@ -483,8 +553,8 @@ def summarize_engagement(conversation, personas, total_rounds):
         for persona, count in per_persona.items()
     ]
 
-
     return round_summary, persona_summary
+
 
 # -----------------------------
 # Function: Format JSON tree Pretty
@@ -498,6 +568,81 @@ def format_json_tree_pretty(messages, level=0):
             tree += format_json_tree_pretty(msg["children"], level + 1)
     return tree
 
+# -----------------------------
+# different goals for the last round
+# (optional, consensus, summary, rebuttal, reflection)
+# -----------------------------
+def build_goal_prompt(goal_type, state):
+    goal_type = goal_type.lower()
+    base = "Based on the entire conversation so far, "
+
+    if goal_type == "consensus":
+        return (
+            base +
+            "work together to identify any shared agreements. "
+            "If a consensus cannot be reached, explain the key points of disagreement and why."
+        )
+
+    elif goal_type == "summary":
+        return (
+            base +
+            "summarize your own perspective in 2–3 sentences. "
+            "Highlight what you found most important or insightful."
+        )
+
+    elif goal_type == "rebuttal":
+        return (
+            base +
+            "critically respond to the most discussed thread. "
+            "Present counterpoints or areas you believe were overlooked."
+        )
+
+    elif goal_type == "reflection":
+        return (
+            base +
+            "reflect on how your point of view may have changed over the course of the discussion. "
+            "What influenced your thinking the most?"
+        )
+
+    elif goal_type == "closing":
+        return (
+            base +
+            "offer any final thoughts, questions, or follow-up ideas you want to share."
+        )
+
+    else:  # fallback or 'optional'
+        return (
+            base +
+            "you may respond with any final comment or choose to sit out."
+        )
+
+# -----------------------------
+# All the conversation history
+# in a single string for Goal Round
+# -----------------------------
+def flatten_conversation_history_with_threads(state):
+    def render_node(node, depth=0):
+        indent = "  " * depth
+        label = f"{node['persona']} (Round {node['round']})"
+        text = node["text"].strip()
+        return f"{indent}- {label}:\n{indent}  {text}"
+
+    id_to_msg = {msg["id"]: msg for msg in state["conversationHistory"]}
+    parent_to_children = defaultdict(list)
+
+    for msg in state["conversationHistory"]:
+        parent_to_children[msg.get("parentId")].append(msg)
+
+    def walk_thread(parent_id=None, depth=0):
+        lines = []
+        for msg in parent_to_children.get(parent_id, []):
+            lines.append(render_node(msg, depth))
+            lines.extend(walk_thread(msg["id"], depth + 1))
+        return lines
+
+    return "\n".join(walk_thread())
+
+
 
 # -----------------------------
 # CLI Entrypoint
@@ -505,17 +650,21 @@ def format_json_tree_pretty(messages, level=0):
 @click.command()
 @click.option('--prompt', required=True, help='The central discussion prompt')
 @click.option('--rounds', default=3, help='Number of conversation rounds')
-# @click.option('--personas', required=True, help='JSON array of persona objects')
 @click.option('--personas-file', required=True, type=click.Path(exists=True), help='Path to a JSON file containing persona definitions')
 @click.option('--save-to', default=None, help='Optional filename to save the final output')
 @click.option('--output', default='markdown', type=click.Choice(['markdown', 'json', 'html', 'tree']), help='Output format')
-def run_cli(prompt, rounds, personas_file, output, save_to):
+@click.option('--goal-round', default='optional', type=click.Choice(['optional', 'consensus', 'summary', 'rebuttal', 'reflection']),
+              help='Type of final round behavior (optional, consensus, summary, etc.)')
+
+def run_cli(prompt, rounds, personas_file, output, save_to, goal_round):
     schema = load_persona_schema()
     client = get_openai_client()
-    # parsed_personas = parse_personas(personas)
     with open(personas_file, 'r', encoding='utf-8') as f:
         personas = json.load(f)
     parsed_personas = parse_personas(personas, schema)
+
+    parsed_personas = enrich_personas_with_file_references(parsed_personas)
+
     state = initialize_state(prompt, rounds, parsed_personas)
 
     state["generatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -525,7 +674,7 @@ def run_cli(prompt, rounds, personas_file, output, save_to):
         cli_command += f" --save-to \"{save_to}\""
     state["cli_command"] = cli_command
 
-    run_conversation(state, client)
+    run_conversation(state, client, goal_round)
     thread_tree = build_thread_tree(state["conversationHistory"])
 
     if output == 'markdown':

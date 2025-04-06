@@ -3,24 +3,28 @@
       "name": "html developer",
       "llm": "ChatGPT",
       "engagement": 0.7,
-      "model": "gpt-3.5-turbo"
+      "model": "gpt-4o"
     },
     {
       "name": "react developer",
       "llm": "ChatGPT",
       "engagement": 0.8,
-      "model": "gpt-3.5-turbo"
+      "model": "gpt-4o",
+      "references": [
+        { "type": "url", "value": "https://react.dev/learn" },
+        { "type": "file", "value": "./ref-files/react-notes.md" }
+      ]
     },
     {
       "name": "astrojs developer",
       "llm": "Gemini",
       "engagement": 0.6,
-      "model": "gpt-3.5-turbo"
+      "model": "gpt-4o"
     },
     {
       "name": "angular developer",
       "llm": "Deepseek",
       "engagement": 0.4,
-      "model": "gpt-3.5-turbo"
+      "model": "gpt-4o"
     }
 ]
