@@ -1,0 +1,26 @@
+[
+  {
+    "section_id": "01-care-guidelines",
+    "title": "01 Care Management Guidelines",
+    "filename": "care-guidelines.md",
+    "content": "",
+    "tags": [
+      "care",
+      "guidelines",
+      "post-acute"
+    ],
+    "product": "care"
+  },
+  {
+    "section_id": "02-home-checklist",
+    "title": "02 Home Safety Checklist",
+    "filename": "home-environment-checklist.md",
+    "content": "",
+    "tags": [
+      "safety",
+      "home",
+      "environment"
+    ],
+    "product": "care"
+  }
+]

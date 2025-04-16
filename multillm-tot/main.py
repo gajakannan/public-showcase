@@ -6,11 +6,13 @@ from datetime import datetime
 from collections import defaultdict
 from jsonschema import validate, ValidationError
 from init import get_openai_client, load_persona_schema
-from persona_utils import enrich_personas_with_file_references
-from html_exporter import generate_html_with_styles
-
-
-# from file_utils import load_file_reference
+from persona_utils import enrich_personas_with_file_references, summarize_discussion
+from exporter_html import generate_html_with_styles
+from exporter_markdown import generate_markdown_from_tree
+from exporter_json import generate_json_from_tree
+from exporter_tree import generate_tree_from_tree
+import re
+from agent_log import setup_prompt_logger, log_prompt
 
 
 COLOR_PALETTE = [
@@ -93,8 +95,29 @@ def get_thread_context(state, message):
 # -----------------------------
 # Function: Get Real LLM Reply (OpenAI)
 # -----------------------------
-def agent_reply(persona, target_text, round_num, client):
-    system_prompt = f"You are a {persona['name']}. Provide thoughtful insights on the following:"
+def agent_reply(persona, target_text, round_num, client, prompt_logger):
+
+    is_goal_round = str(round_num).lower().startswith("goal")
+    is_decision_round = is_goal_round and "decision" in round_num.lower()
+
+    system_prompt = f"You are a {persona['name']}."
+
+    # print(f"[dim]{is_goal_round}, {is_decision_round}, {persona.get('round_awareness')}[/dim]")
+
+    if is_goal_round:
+        goal_label = round_num.split("-")[-1].strip().capitalize()  # e.g., "decision"
+        system_prompt += f"You are now in the round labeled: Goal - {goal_label}. "
+    else:
+        system_prompt += "You are in a regular discussion round."
+
+    # Add the persona's prompt
+    if is_goal_round and "goal_prompt" in persona:
+        system_prompt += " " + persona["goal_prompt"]
+    elif not is_goal_round and "regular_prompt" in persona:
+        system_prompt += " " + persona["regular_prompt"]
+    else:
+        system_prompt += " Provide thoughtful insights on the following:"
+
     user_prompt = target_text
 
     # Inject preloaded file references if available
@@ -114,6 +137,10 @@ def agent_reply(persona, target_text, round_num, client):
         # user_prompt = "\n\n".join(ref_texts) + "\n\n" + user_prompt
 
     try:
+        if prompt_logger:
+            # Log system and user prompts
+            log_prompt(prompt_logger, persona['name'], "system", system_prompt)
+            log_prompt(prompt_logger, persona['name'], "user", user_prompt)
         response = client.chat.completions.create(
             # model="gpt-3.5-turbo",
             model=persona.get("model", "gpt-3.5-turbo"),
@@ -123,7 +150,13 @@ def agent_reply(persona, target_text, round_num, client):
             ],
             temperature=0.7
         )
-        return response.choices[0].message.content.strip()
+        reply = response.choices[0].message.content.strip()
+
+        # ✅ Suggestion #2: Log the assistant reply
+        if prompt_logger:
+            log_prompt(prompt_logger, persona['name'], "assistant", reply)
+
+        return reply
 
     except Exception as e:
         print(f"[red]Failed to get response from OpenAI for {persona['name']}[/red]")
@@ -133,7 +166,7 @@ def agent_reply(persona, target_text, round_num, client):
 # -----------------------------
 # Function: Run the Conversation
 # -----------------------------
-def run_conversation(state, client, goal_round="optional"):
+def run_conversation(state, client, prompt_logger, goal_round="optional"):
     state["runtime_log"] = []
 
     def log_line(line):
@@ -141,26 +174,25 @@ def run_conversation(state, client, goal_round="optional"):
         print(line)
 
     while state["currentRound"] <= state["rounds"]:
-        # print(f"\n[bold cyan]--- Round {state['currentRound']} ---[/bold cyan]")
-        log_line(f"--- Round {state['currentRound']} ---")
+        log_line(f"\n--- Round {state['currentRound']} ---")
 
         for persona in state["personas"]:
-            # engagement_rate = persona.get("engagement", 0.7)
             supplied_engagement_rate = persona.get("engagement", 0.7)
-            engagement_rate = 0.75 if state["currentRound"] == 1 else supplied_engagement_rate
+            engagement_rate = supplied_engagement_rate
             will_reply = random.random() < engagement_rate
             if not will_reply:
-                # print(f"[dim]{persona['name']} chose to sit out this round.[/dim]")
                 log_line(f"{persona['name']} chose to sit out this round.")
                 continue
 
+            if "resolved_qdrant_titles" in persona:
+                log_line(f"[dim]{persona['name']} Qdrant matches:[/dim] {persona['resolved_qdrant_titles']}")
+
             target = state["prompt"] if state["currentRound"] == 1 else pick_random_message(state)
-            # target_text = target if isinstance(target, str) else target["text"]
             target_text = target if isinstance(target, str) else get_thread_context(state, target)
 
             parent_id = None if isinstance(target, str) else target["id"]
 
-            reply_text = agent_reply(persona, target_text, state["currentRound"], client)
+            reply_text = agent_reply(persona, target_text, state["currentRound"], client, prompt_logger)
             message_id = f"msg-{state['currentRound']}-{persona['name']}"
 
             state["conversationHistory"].append({
@@ -170,17 +202,17 @@ def run_conversation(state, client, goal_round="optional"):
                 "llm": persona["llm"],
                 "parentId": parent_id,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "text": reply_text
+                "text": reply_text,
+                "rag_score": score_rag_effectiveness(reply_text, persona) 
             })
 
-            # print(f"[green]{persona['name']} replied → {message_id}[/green]")
             log_line(f"{persona['name']} replied → {message_id}")
 
         state["currentRound"] += 1
 
     # Goal round handling (only once, after all normal rounds)
     if goal_round != "optional":
-        log_line(f"[bold magenta]--- Goal Round: {goal_round.upper()} ---[/bold magenta]")
+        log_line(f"\n[bold magenta]--- Goal Round: {goal_round.upper()} ---[/bold magenta]")
 
         # target_text = build_goal_prompt(goal_round, state)
         full_history = flatten_conversation_history_with_threads(state)
@@ -196,7 +228,9 @@ def run_conversation(state, client, goal_round="optional"):
         for persona in state["personas"]:
             log_line(f"{persona['name']} is participating in the goal round.")
 
-            reply_text = agent_reply(persona, target_text, state["currentRound"], client)
+            goal_label = f"Goal - {goal_round.capitalize()}"
+            reply_text = agent_reply(persona, target_text, goal_label, client, prompt_logger)
+            # reply_text = agent_reply(persona, target_text, state["currentRound"], client, prompt_logger)
             message_id = f"msg-{state['currentRound']}-{persona['name']}"
 
             state["conversationHistory"].append({
@@ -206,12 +240,42 @@ def run_conversation(state, client, goal_round="optional"):
                 "llm": persona["llm"],
                 "parentId": parent_id,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "text": reply_text
+                "text": reply_text,
+                "rag_score": score_rag_effectiveness(reply_text, persona) 
             })
 
             log_line(f"{persona['name']} replied → {message_id}")
 
         state["currentRound"] += 1
+
+# -----------------------------
+# Function: Rag Effectiveness Score
+# -----------------------------
+def score_rag_effectiveness(reply_text, persona):
+    if not persona.get("resolved_qdrant_titles"):
+        return None
+
+    score = 0.0
+
+    # 1. Check if any Qdrant chunk titles appear in the reply
+    titles = persona.get("resolved_qdrant_titles", [])
+    if any(title.replace("[Qdrant match: ", "").replace("]", "") in reply_text for title in titles):
+        score += 0.4
+
+    # 2. Check for use of numbers, surcharges, JSON-like elements
+    if re.search(r"\$?\d{2,4}", reply_text):  # e.g., "$500", "550"
+        score += 0.2
+    if "%" in reply_text or "discount" in reply_text.lower() or "surcharge" in reply_text.lower():
+        score += 0.1
+    if "deductible" in reply_text.lower():
+        score += 0.1
+
+    # 3. JSON block present?
+    if "{" in reply_text and "}" in reply_text and "decision" in reply_text:
+        score += 0.2
+
+    return round(min(score, 1.0), 2)
+
 
 # -----------------------------
 # Function: Build Nested Thread Tree
@@ -236,299 +300,6 @@ def build_thread_tree(conversation_history):
             roots.append(msg)
 
     return roots
-
-# -----------------------------
-# Function: Format Markdown Recursively
-# -----------------------------
-def format_markdown_from_tree(messages, level=0):
-    markdown = ""
-    indent = ">" * level
-
-    for msg in messages:
-        persona = msg["persona"]
-        text = msg["text"].strip()
-
-        if indent:
-            markdown += f"{indent} **{persona}**:\n\n{indent} {text}\n\n"
-        else:
-            markdown += f"**{persona}**:\n\n{text}\n\n"
-
-        if msg.get("children"):
-            markdown += format_markdown_from_tree(msg["children"], level + 1)
-
-    return markdown
-
-# -----------------------------
-# Function: Format HTML tree Recursively
-# -----------------------------
-def format_html_from_tree(nodes, state, depth=0):
-    html = ""
-    
-    for node in nodes:
-        indent = depth * 20
-        color = state["personaColors"].get(node["persona"], "#7f8c8d")
-
-        timestamp = node.get("timestamp", "unknown time")
-
-        html += f'''
-            <details open>
-            <summary>
-                <span class="persona" style="color: {color};">{node["persona"]}</span>
-                <span class="round-badge">Round {node["round"]}</span>
-                <span class="timestamp">{timestamp}</span>
-            </summary>
-            <div class="node" style="margin-left: {indent}px;">
-                {node["text"].strip()}
-            </div>
-            '''
-
-        if node.get("children"):
-            html += format_html_from_tree(node["children"], state, depth + 1)
-
-        html += '</details>\n'
-    return html
-
-
-# # -----------------------------
-# # Function: HTML Template with Styles
-# # -----------------------------
-# def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_colors, engagement_score, total_comments, state):
-#     html = f"""<!DOCTYPE html>
-#         <html>
-#         <head>
-#             <meta charset="UTF-8">
-#             <title>{title}</title>
-#             <style>
-#                 body {{
-#                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-#                     background-color: #f9f9f9;
-#                     color: #333;
-#                     margin: 2em;
-#                 }}
-#                 h1 {{
-#                     color: #222;
-#                 }}
-#                 .timestamp {{
-#                     font-size: 0.9em;
-#                     color: #555;
-#                     margin-bottom: 1em;
-#                 }}
-#                 .meta-bar {{
-#                     background-color: #0f172a;
-#                     color: white;
-#                     padding: 12px 16px;
-#                     border-radius: 8px;
-#                     display: flex;
-#                     gap: 1.5em;
-#                     font-size: 0.9em;
-#                     margin-bottom: 1.5em;
-#                 }}
-#                 .meta-bar span {{
-#                     display: flex;
-#                     align-items: center;
-#                     gap: 0.4em;
-#                 }}
-#                 .message {{
-#                     background-color: white;
-#                     line-height: 1.45;
-#                     border: 1px solid #ccc;
-#                     border-radius: 8px;
-#                     padding: 0.50em 1em;
-#                     margin: 0.5em 0;
-#                 }}
-#                 .persona {{
-#                     font-weight: bold;
-#                     padding: 2px 6px;
-#                     border-radius: 6px;
-#                     background-color: rgba(255, 255, 255, 0.15);
-#                     color: white;
-#                 }}
-#                 .round-badge {{
-#                     background-color: #334155; /* slate-700 */
-#                     color: #f1f5f9;            /* slate-100 */
-#                     border-radius: 12px;
-#                     padding: 2px 8px;
-#                     font-size: 0.8em;
-#                     margin-left: 10px;
-#                 }}
-#                 .goal-badge {{
-#                     background-color: #9333ea; /* purple */
-#                     color: white;
-
-#                 }}
-#                 .timestamp-badge {{
-#                     font-size: 0.75em;
-#                     color: #cbd5e1;  /* slate-300 */
-#                     margin-left: 12px;
-#                 }}
-#                 .thread {{
-#                     margin-left: 1em;
-#                     border-left: 2px solid #ccc;
-#                     padding-left: .5em;
-#                 }}
-#                 details {{
-#                     margin-top: 0.25em;
-#                     margin-bottom: 0.25em;
-#                     background: linear-gradient(to right, #1e1b4b, #312e81);
-#                     padding: 1em;
-#                     border-radius: 8px;
-#                 }}
-#                 summary {{
-#                     font-weight: bold;
-#                     cursor: pointer;
-#                 }}
-#                 details summary {{
-#                     color: white;
-#                     font-weight: bold;
-#                 }}
-#                 details ul, details li {{
-#                     color: white;
-#                 }}
-#                 .extra-meta {{
-#                     margin-top: 2em;
-#                 }}
-#                 .extra-meta details {{
-#                     background: #0f172a;
-#                     color: #f8fafc;
-#                     padding: 1em;
-#                     margin-bottom: 1em;
-#                     border-radius: 8px;
-#                     font-family: 'Fira Mono', monospace;
-#                 }}
-#                 .extra-meta summary {{
-#                     font-weight: bold;
-#                     font-size: 1em;
-#                     cursor: pointer;
-#                     color: #f8fafc;
-#                 }}
-#                 .extra-meta pre {{
-#                     background-color: #1e293b;
-#                     color: #f1f5f9;
-#                     padding: 0.75em;
-#                     margin-top: 0.5em;
-#                     border-radius: 6px;
-#                     overflow-x: auto;
-#                     font-size: 0.9em;
-#                 }}
-#             </style>
-#         </head>
-#         <body>
-#         <h1>Discussion: {title}</h1>
-#         <div class="timestamp">Generated on <em>{timestamp}</em></div>
-
-#         <div class="meta-bar">
-#             <span>🔥 Engagement Level: {engagement_score:.0%}</span>
-#             <span>💬 Comments: {total_comments}</span>
-#         </div>
-#         """
-
-#     def get_round_class(round_value):
-#         base = "round-badge"
-#         if isinstance(round_value, str) and round_value.lower().startswith("goal"):
-#             return base + " goal-badge"
-#         return base
-
-#     def format_round_label(round_value):
-#         if isinstance(round_value, str) and round_value.lower().startswith("goal"):
-#             return f"🟣 {round_value}"
-#         return f"Round {round_value}"
-
-
-#     def render_node(node):
-#         color = persona_colors.get(node["persona"], "#000")
-#         content = f"""
-#             <details open>
-#                 <summary>
-#                     <span class="persona" style="color: {color};">{node['persona']}</span>
-#                     <span class="{get_round_class(node['round'])}">{format_round_label(node['round'])}</span>
-#                     <span class="timestamp-badge">{node['timestamp']}</span>
-#                 </summary>
-#                 <div class="message">{node['text']}</div>
-#             """
-#         for child in node.get("children", []):
-#             content += f'<div class="thread">{render_node(child)}</div>\n'
-#         content += "</details>\n"
-#         return content
-
-#     # Split normal vs goal nodes
-#     normal_nodes = [n for n in tree if not (isinstance(n["round"], str) and n["round"].lower().startswith("goal"))]
-#     goal_nodes = [n for n in tree if isinstance(n["round"], str) and n["round"].lower().startswith("goal")]
-
-#     # Render normal discussion first
-#     for node in normal_nodes:
-#         html += render_node(node)
-
-#     # Render grouped goal section (if any)
-#     if goal_nodes:
-#         html += "<h2 style='margin-top: 0.5em; color: #9333ea;'>🟣 Goal Round</h2>\n"
-#         for node in goal_nodes:
-#             html += render_node(node)
-
-#     # for top_node in tree:
-#     #     is_goal = isinstance(top_node["round"], str) and top_node["round"].lower().startswith("goal")
-
-#     #     if is_goal:
-#     #         html += f"<h2 style='margin-top: 2em; color: #9333ea;'>🟣 {top_node['round']}</h2>"
-#     #     html += render_node(top_node)
-
-#     # Summary section at the bottom
-#     html += """
-#         <details>
-#             <summary>📝 Discussion Summary</summary>
-#             <ul>
-#         """
-#     for line in summary_lines:
-#         html += f"<li>{line}</li>\n"
-#     html += "</ul></details></div>"
-
-
-#     html += f"""
-#         <div class="extra-meta">
-
-#         <details open>
-#         <summary>💻 CLI Command</summary>
-#         <div style="background-color: #1e293b; border-radius: 6px; padding: 0.5em 0.75em; margin-bottom: 1em;">
-#             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25em;">
-#             <span style="color: #f1f5f9; font-size: 0.9em;">Copy this command:</span>
-#             <button onclick="copyToClipboard('cli-command')" style="background-color: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">📋 Copy</button>
-#             </div>
-#             <pre style="margin: 0;"><code id="cli-command" style="color: #f1f5f9;">{state['cli_command']}</code></pre>
-#         </div>
-#         </details>
-
-#         <details>
-#         <summary>📜 Run Log</summary>
-#         <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
-#         </details>
-
-#         </div>
-
-#         <script>
-#         function copyToClipboard(id) {{
-#             const text = document.getElementById(id).innerText;
-#             const button = event.target;
-
-#             navigator.clipboard.writeText(text).then(() => {{
-#             const originalText = button.innerText;
-#             button.innerText = "✅ Copied";
-#             button.disabled = true;
-
-#             setTimeout(() => {{
-#                 button.innerText = originalText;
-#                 button.disabled = false;
-#             }}, 2000);
-#             }}).catch(err => {{
-#             alert("Failed to copy: " + err);
-#             }});
-#         }}
-#         </script>
-
-#         """
-
-
-#     html += "</body></html>"
-#     return html
-
 
 # -----------------------------
 # Function: Engagement Summary
@@ -560,20 +331,8 @@ def summarize_engagement(conversation, personas, total_rounds):
 
 
 # -----------------------------
-# Function: Format JSON tree Pretty
-# -----------------------------
-def format_json_tree_pretty(messages, level=0):
-    tree = ""
-    indent = "  " * level
-    for msg in messages:
-        tree += f"{indent}- {msg['persona']} (Round {msg['round']}): {msg['text'][:60]}...\n"
-        if msg.get("children"):
-            tree += format_json_tree_pretty(msg["children"], level + 1)
-    return tree
-
-# -----------------------------
 # different goals for the last round
-# (optional, consensus, summary, rebuttal, reflection)
+# (optional, consensus, summary, rebuttal, reflection, decision)
 # -----------------------------
 def build_goal_prompt(goal_type, state):
     goal_type = goal_type.lower()
@@ -612,7 +371,12 @@ def build_goal_prompt(goal_type, state):
             base +
             "offer any final thoughts, questions, or follow-up ideas you want to share."
         )
-
+    elif goal_type == "decision":
+        return (
+            base +
+            "you must now make a clear decision or recommendation based on the discussion. "
+            "Be specific, concise, and explain your reasoning clearly. Avoid summarizing."
+        )
     else:  # fallback or 'optional'
         return (
             base +
@@ -656,7 +420,7 @@ def flatten_conversation_history_with_threads(state):
 @click.option('--personas-file', required=True, type=click.Path(exists=True), help='Path to a JSON file containing persona definitions')
 @click.option('--save-to', default=None, help='Optional filename to save the final output')
 @click.option('--output', default='markdown', type=click.Choice(['markdown', 'json', 'html', 'tree']), help='Output format')
-@click.option('--goal-round', default='optional', type=click.Choice(['optional', 'consensus', 'summary', 'rebuttal', 'reflection']),
+@click.option('--goal-round', default='optional', type=click.Choice(['optional', 'consensus', 'decision' , 'summary', 'rebuttal', 'reflection']),
               help='Type of final round behavior (optional, consensus, summary, etc.)')
 
 def run_cli(prompt, rounds, personas_file, output, save_to, goal_round):
@@ -671,20 +435,26 @@ def run_cli(prompt, rounds, personas_file, output, save_to, goal_round):
     state = initialize_state(prompt, rounds, parsed_personas)
 
     state["generatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    session_id = state["generatedAt"].replace(" ", "T").replace(":", "-")
+    prompt_logger = setup_prompt_logger(session_id)
+
+
     cli_command = f"python main.py --prompt \"{prompt}\" --rounds {rounds} --personas-file '{personas_file}' --output {output}"
 
     if save_to:
         cli_command += f" --save-to \"{save_to}\""
     state["cli_command"] = cli_command
 
-    run_conversation(state, client, goal_round)
+    run_conversation(state, client, prompt_logger ,goal_round)
     thread_tree = build_thread_tree(state["conversationHistory"])
 
     if output == 'markdown':
-        result = f"## Discussion: {state['prompt']}\n\n"
-        result += format_markdown_from_tree(thread_tree)
+        # result = f"## Discussion: {state['prompt']}\n\n"
+        # result += format_markdown_from_tree(thread_tree)
+        result = generate_markdown_from_tree(thread_tree, state["prompt"])
     elif output == 'json':
-        result = json.dumps(thread_tree, indent=2)
+        # result = json.dumps(thread_tree, indent=2)
+        result = generate_json_from_tree(thread_tree)
     elif output == 'html':
         round_summary, persona_summary = summarize_engagement(
             state["conversationHistory"], 
@@ -698,6 +468,9 @@ def run_cli(prompt, rounds, personas_file, output, save_to, goal_round):
         engagement_score = actual_total / max_possible if max_possible else 0
         total_comments = actual_total
 
+        state["discussionSummary"] = summarize_discussion(
+            state["conversationHistory"], client, model="gpt-4o")
+
         result = generate_html_with_styles(
             tree=thread_tree,
             title=state["prompt"],
@@ -706,10 +479,13 @@ def run_cli(prompt, rounds, personas_file, output, save_to, goal_round):
             persona_colors=state["personaColors"],
             engagement_score=engagement_score,
             total_comments=total_comments,
-            state=state
+            cli_command=state["cli_command"],
+            runtime_log=state["runtime_log"],
+            discussion_summary=state["discussionSummary"]
         )
     elif output == 'tree':
-        result = format_json_tree_pretty(thread_tree)
+        # result = format_json_tree_pretty(thread_tree)
+        result = generate_tree_from_tree(thread_tree)
     else:
         result = "[ERROR] Unsupported output format."
 

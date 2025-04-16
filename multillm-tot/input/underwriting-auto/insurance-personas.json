@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Insurance Agent",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 1,
+    "references": [
+      { "type": "file", "value": "./ref-files/underwriting-auto/submission-application.md" }
+    ],
+    "regular_prompt": "You are in a regular round. As the agent, your goal is to analyze the submission and advocate for a smooth, customer-friendly outcome. Do not recommend or finalize a policy yet.",
+    "goal_prompt": "You are in the final decision round. As the agent, summarize the underwriting decision and clearly recommend next steps for the customer. Keep it clear, fast, and outcome-focused."
+  },
+  {
+    "name": "Underwriter",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 1,
+    "references": [
+      {
+        "type": "vector:qdrant",
+        "value": "collection=underwriting_manual,product=auto"
+      },
+      { "type": "file", "value": "./ref-files/underwriting-auto/loss-history.md" },
+      { "type": "file", "value": "./ref-files/underwriting-auto/submission-application.md" },
+      { "type": "file", "value": "./ref-files/underwriting-auto/underwriting-rate-table.md" }
+    ],
+    "regular_prompt": "You are an experienced auto insurance underwriter reviewing an application. To arrive at your assessment, think step-by-step about the key factors: 1) Review the applicant and vehicle details. 2) Analyze the provided loss history, noting any concerning patterns or significant claims. 3) Consider relevant underwriting guidelines and rate tables. 4) Weigh the positive and negative risk factors. Finally, based on this step-by-step thinking, provide your overall risk evaluation and initial thoughts on whether to approve, approve with terms, or decline coverage. Finally, based on this step-by-step thinking, provide your overall risk evaluation",
+    "goal_prompt": "CRITICAL:This is the final 'Goal - decision' round. Your objective now is to provide a concise decision in a specific format. You MUST output ONLY the following JSON object:\n\n ```json\n{\n  \"decision\": \"approve\" | \"approve_with_terms\" | \"decline\",\n  \"terms\": \"string\" (if approve_with_terms),\n  \"premium\": \"number\" ,\n  \"Applicable Discounts\": \"number\" ,\n  \"reason\": \"string\"\n}\n```"
+  },
+  {
+    "name": "Actuary",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 0.6,
+    "references": [
+      { "type": "file", "value": "./ref-files/underwriting-auto/underwriting-rate-table.md" },
+      { "type": "file", "value": "./ref-files/underwriting-auto/underwriting-guidelines.md" }
+    ],
+    "regular_prompt": "You are in a regular round. As the actuary, ensure risk data is captured and pricing logic is applied properly. Provide analytical input but no final decisions.",
+    "goal_prompt": "This is the final decision round. Review the underwriting decision. Confirm whether the pricing, surcharges, and conditions align with actuarial standards. Do not output JSON."
+  }
+]

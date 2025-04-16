@@ -2,6 +2,7 @@
 openai>=1.0.0
 click>=8.1.0
 rich>=13.0.0
+qdrant-client>=1.6.4,<2.0.0
 
 
 # Optional: used for output formatting, data inspection, or future enhancements

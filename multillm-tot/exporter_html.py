@@ -1,10 +1,54 @@
 from datetime import datetime
 from collections import defaultdict
 
+def get_round_class(round_value):
+    base = "round-badge"
+    if isinstance(round_value, str) and round_value.lower().startswith("goal"):
+        return base + " goal-badge"
+    return base
+
+def format_round_label(round_value):
+    if isinstance(round_value, str) and round_value.lower().startswith("goal"):
+        return f"🟣 {round_value}"
+    return f"Round {round_value}"
+
+def render_node(node, persona_colors):
+    color = persona_colors.get(node["persona"], "#000")
+    content = f"""
+        <details open>
+            <summary>
+                <span class="persona" style="color: {color};">{node['persona']}</span>
+                <span class="{get_round_class(node['round'])}">{format_round_label(node['round'])}</span>
+                <span class="timestamp-badge">{node['timestamp']}</span>
+            </summary>
+            <div class="message">
+                {node['text']}
+                {"<div style='font-size: 0.8em; color: #6b7280; margin-top: 0.5em;'>RAG Score: " + (str(node['rag_score']) if node['rag_score'] is not None else "Not Applicable") + "</div>" if "rag_score" in node else ""}
+            </div>
+    """
+    for child in node.get("children", []):
+        content += f'<div class="thread">{render_node(child, persona_colors)}</div>\n'
+    content += "</details>\n"
+    return content
+
 # -----------------------------
 # Function: HTML Template with Styles
 # -----------------------------
-def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_colors, engagement_score, total_comments, state):
+def generate_html_with_styles(
+        tree, 
+        title, 
+        timestamp, 
+        summary_lines, 
+        persona_colors, 
+        engagement_score, 
+        total_comments, 
+        cli_command,
+        runtime_log,
+        discussion_summary=None):
+    #     state):
+    # cli_command = state["cli_command"]
+    # runtime_log = state["runtime_log"]
+
     html = f"""<!DOCTYPE html>
         <html>
         <head>
@@ -17,9 +61,7 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
                     color: #333;
                     margin: 2em;
                 }}
-                h1 {{
-                    color: #222;
-                }}
+                h1 {{ color: #222; }}
                 .timestamp {{
                     font-size: 0.9em;
                     color: #555;
@@ -56,21 +98,20 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
                     color: white;
                 }}
                 .round-badge {{
-                    background-color: #334155; /* slate-700 */
-                    color: #f1f5f9;            /* slate-100 */
+                    background-color: #334155;
+                    color: #f1f5f9;
                     border-radius: 12px;
                     padding: 2px 8px;
                     font-size: 0.8em;
                     margin-left: 10px;
                 }}
                 .goal-badge {{
-                    background-color: #9333ea; /* purple */
+                    background-color: #9333ea;
                     color: white;
-
                 }}
                 .timestamp-badge {{
                     font-size: 0.75em;
-                    color: #cbd5e1;  /* slate-300 */
+                    color: #cbd5e1;
                     margin-left: 12px;
                 }}
                 .thread {{
@@ -79,8 +120,7 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
                     padding-left: .5em;
                 }}
                 details {{
-                    margin-top: 0.25em;
-                    margin-bottom: 0.25em;
+                    margin: 0.25em 0;
                     background: linear-gradient(to right, #1e1b4b, #312e81);
                     padding: 1em;
                     border-radius: 8px;
@@ -88,12 +128,6 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
                 summary {{
                     font-weight: bold;
                     cursor: pointer;
-                }}
-                details summary {{
-                    color: white;
-                    font-weight: bold;
-                }}
-                details ul, details li {{
                     color: white;
                 }}
                 .extra-meta {{
@@ -134,110 +168,74 @@ def generate_html_with_styles(tree, title, timestamp, summary_lines, persona_col
         </div>
         """
 
-    def get_round_class(round_value):
-        base = "round-badge"
-        if isinstance(round_value, str) and round_value.lower().startswith("goal"):
-            return base + " goal-badge"
-        return base
-
-    def format_round_label(round_value):
-        if isinstance(round_value, str) and round_value.lower().startswith("goal"):
-            return f"🟣 {round_value}"
-        return f"Round {round_value}"
-
-
-    def render_node(node):
-        color = persona_colors.get(node["persona"], "#000")
-        content = f"""
-            <details open>
-                <summary>
-                    <span class="persona" style="color: {color};">{node['persona']}</span>
-                    <span class="{get_round_class(node['round'])}">{format_round_label(node['round'])}</span>
-                    <span class="timestamp-badge">{node['timestamp']}</span>
-                </summary>
-                <div class="message">{node['text']}</div>
-            """
-        for child in node.get("children", []):
-            content += f'<div class="thread">{render_node(child)}</div>\n'
-        content += "</details>\n"
-        return content
-
-    # Split normal vs goal nodes
+    # Split discussion vs goal round nodes
     normal_nodes = [n for n in tree if not (isinstance(n["round"], str) and n["round"].lower().startswith("goal"))]
     goal_nodes = [n for n in tree if isinstance(n["round"], str) and n["round"].lower().startswith("goal")]
 
-    # Render normal discussion first
     for node in normal_nodes:
-        html += render_node(node)
+        html += render_node(node, persona_colors)
 
-    # Render grouped goal section (if any)
     if goal_nodes:
-        html += "<h2 style='margin-top: 0.5em; color: #9333ea;'>🟣 Goal Round</h2>\n"
+        html += "<h2 style='margin-top: 2em; color: #9333ea;'>🟣 Goal Round</h2>\n"
         for node in goal_nodes:
-            html += render_node(node)
+            html += render_node(node, persona_colors)
 
-    # for top_node in tree:
-    #     is_goal = isinstance(top_node["round"], str) and top_node["round"].lower().startswith("goal")
-
-    #     if is_goal:
-    #         html += f"<h2 style='margin-top: 2em; color: #9333ea;'>🟣 {top_node['round']}</h2>"
-    #     html += render_node(top_node)
-
-    # Summary section at the bottom
     html += """
-        <details>
-            <summary>📝 Discussion Summary</summary>
-            <ul>
-        """
-    for line in summary_lines:
-        html += f"<li>{line}</li>\n"
-    html += "</ul></details></div>"
+    <details open>
+    <summary>📝 Discussion Summary</summary>
+    """
 
+    if discussion_summary:
+        html += f"""
+        <div style='margin-bottom: 1em; color: white;'>
+            <p><strong>Case Summary:</strong> {discussion_summary}</p>
+        </div>
+        """
+
+    html += "<ul>\n"
+    for line in summary_lines:
+        html += f"<li style='color: white'>{line}</li>\n"
+    html += "</ul></details>"
 
     html += f"""
         <div class="extra-meta">
-
         <details open>
         <summary>💻 CLI Command</summary>
         <div style="background-color: #1e293b; border-radius: 6px; padding: 0.5em 0.75em; margin-bottom: 1em;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25em;">
-            <span style="color: #f1f5f9; font-size: 0.9em;">Copy this command:</span>
-            <button onclick="copyToClipboard('cli-command')" style="background-color: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">📋 Copy</button>
+                <span style="color: #f1f5f9; font-size: 0.9em;">Copy this command:</span>
+                <button onclick="copyToClipboard('cli-command')" style="background-color: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">📋 Copy</button>
             </div>
-            <pre style="margin: 0;"><code id="cli-command" style="color: #f1f5f9;">{state['cli_command']}</code></pre>
+            <pre style="margin: 0;"><code id="cli-command" style="color: #f1f5f9;">{cli_command}</code></pre>
         </div>
         </details>
 
         <details>
         <summary>📜 Run Log</summary>
-        <pre><code>{chr(10).join(state['runtime_log'])}</code></pre>
+        <pre><code>{chr(10).join(runtime_log)}</code></pre>
         </details>
-
         </div>
 
         <script>
         function copyToClipboard(id) {{
             const text = document.getElementById(id).innerText;
             const button = event.target;
-
             navigator.clipboard.writeText(text).then(() => {{
-            const originalText = button.innerText;
-            button.innerText = "✅ Copied";
-            button.disabled = true;
-
-            setTimeout(() => {{
-                button.innerText = originalText;
-                button.disabled = false;
-            }}, 2000);
+                const originalText = button.innerText;
+                button.innerText = "✅ Copied";
+                button.disabled = true;
+                setTimeout(() => {{
+                    button.innerText = originalText;
+                    button.disabled = false;
+                }}, 2000);
             }}).catch(err => {{
-            alert("Failed to copy: " + err);
+                alert("Failed to copy: " + err);
             }});
         }}
         </script>
 
         """
 
-
     html += "</body></html>"
-    return html
 
+    return html

@@ -1,0 +1,98 @@
+[
+  {
+    "section_id": "00-introduction",
+    "title": "00 Introduction",
+    "filename": "00-introduction.md",
+    "content": "# Hello Insurance Underwriting Manual\n\n## Introduction\n\nWelcome to the Hello Insurance Underwriting Manual for Personal Auto and Restaurant Insurance Products. This guide is intended for underwriters, risk evaluators, and internal teams responsible for managing risk exposure and making underwriting decisions across personal and commercial lines.\n\nThe manual serves three purposes:\n1. Provide standardized criteria for risk selection.\n2. Promote consistency in underwriting decisions.\n3. Act as a reference for acceptable practices, documentation, and workflows.\n\nUnderwriters are expected to apply sound judgment while adhering to these guidelines. When in doubt, refer to senior underwriters or the Risk Governance Committee.\n\n---\n\n### Key Underwriting Principles\n\n- **Admissibility**: Is the risk insurable under our current appetite?\n- **Affordability**: Can we price the risk competitively while remaining profitable?\n- **Appropriateness**: Does the coverage fit the insured's true exposure?\n- **Accountability**: Are exceptions clearly justified and documented?\n\n---\n\n## Product Scope\n\nThis manual covers two lines of business:\n- **Personal Auto Insurance**: Private passenger vehicles used for personal purposes.\n- **Restaurant Insurance**: Commercial policies for food establishments, including fast-casual, dine-in, and takeout businesses.\n\nBoth lines follow a modular underwriting process but differ in eligibility criteria, pricing models, and inspection practices.",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "general"
+  },
+  {
+    "section_id": "01-auto-eligibility",
+    "title": "01 Auto Eligibility",
+    "filename": "01-auto-eligibility.md",
+    "content": "# Section 1: Auto Insurance \u2013 Eligibility\n\n## Driver Eligibility\n\nTo qualify for coverage under a Hello Insurance personal auto policy, the applicant must:\n\n- Be at least 18 years old\n- Possess a valid U.S. driver's license\n- Have a minimum of 3 years driving experience\n- Have no more than 2 at-fault accidents or major violations in the past 3 years\n- Not have any DUI/DWI convictions in the last 5 years\n\nDrivers with suspended or foreign licenses are not eligible unless accompanied by a licensed U.S. co-driver.\n\n---\n\n## Vehicle Eligibility\n\nAcceptable vehicles include:\n\n- Private passenger cars (sedans, hatchbacks, coupes)\n- Light trucks or SUVs under 10,000 lbs GVWR\n- Vehicles not used for rideshare, delivery, or commercial purposes\n\n**Ineligible vehicles**:\n- Salvaged or rebuilt titles\n- Exotic or high-performance vehicles (e.g., Ferrari, Lamborghini)\n- Vehicles modified for speed or off-road use\n- Kit cars or homemade vehicles\n\nVehicles older than 20 years may be considered with a favorable driving record and limited usage (< 5,000 miles/year).",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "auto"
+  },
+  {
+    "section_id": "02-auto-coverages",
+    "title": "02 Auto Coverages",
+    "filename": "02-auto-coverages.md",
+    "content": "# Section 2: Auto Insurance \u2013 Coverage Options\n\n## Core Coverages\n\n- **Bodily Injury Liability**: Covers medical expenses and legal fees for injuries caused to others.\n- **Property Damage Liability**: Pays for damage caused to another person\u2019s property.\n- **Collision Coverage**: Covers repair/replacement costs for the insured\u2019s vehicle after a collision.\n- **Comprehensive Coverage**: Covers non-collision damage such as theft, fire, vandalism, or weather.\n\n## Optional Coverages\n\n- **Rental Reimbursement**: Pays for a rental car during covered repairs.\n- **Roadside Assistance**: Includes towing, jump-starts, lockout services.\n- **Gap Coverage**: Covers the difference between vehicle value and loan amount in case of total loss.\n- **OEM Parts Endorsement**: Guarantees use of original equipment manufacturer parts for repairs.\n\n---\n\n## Coverage Limits & Deductibles\n\n- Minimum liability limits must meet or exceed the state-mandated threshold.\n- Deductibles for collision and comprehensive typically range from $250 to $1,000.\n- Underwriters may recommend higher deductibles for high-risk drivers to mitigate exposure.",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "auto"
+  },
+  {
+    "section_id": "03-auto-pricing",
+    "title": "03 Auto Pricing",
+    "filename": "03-auto-pricing.md",
+    "content": "# Section 3: Auto Insurance \u2013 Pricing, Discounts, and Surcharges\n\n## Pricing Components\n\n1. **Base Rate**: Determined by vehicle type, age, location, and usage.\n2. **Driver Risk Factor**: Points added based on age, violations, and accident history.\n3. **Territory Modifiers**: Geographic risk adjustments based on ZIP codes.\n4. **Policy Attributes**: Term length, payment method, prior coverage.\n\n---\n\n## Discounts\n\n| Discount Type            | Amount    |\n|--------------------------|-----------|\n| Multi-policy             | 10%       |\n| Safe Driver (3 yrs clean)| 15%       |\n| Anti-theft Device        | 5%        |\n| Good Student             | 7%        |\n| Defensive Driving Course | 5%        |\n| Low Mileage (<7,500)     | 8%        |\n\nDiscounts are stackable but capped at a 30% total.\n\n---\n\n## Surcharges\n\n| Surcharge Type                        | Amount     |\n|--------------------------------------|------------|\n| At-fault Accident (last 3 years)     | +15% each  |\n| Major Violation (DUI, Reckless)      | +25%       |\n| High-Crime Area Registration         | +10%       |\n| Vehicle Modifications (Performance)  | +20%       |",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "auto"
+  },
+  {
+    "section_id": "04-auto-workflow",
+    "title": "04 Auto Workflow",
+    "filename": "04-auto-workflow.md",
+    "content": "# Section 4: Auto Insurance \u2013 Underwriting Workflow\n\n## New Business Workflow\n\n1. **Submission Intake**\n   - Verify identity, vehicle VIN, and prior coverage.\n   - Pull MVR (Motor Vehicle Report) and CLUE reports.\n\n2. **Risk Evaluation**\n   - Apply eligibility rules.\n   - Score the risk using internal risk scoring tools.\n\n3. **Decision Making**\n   - Approve, refer, or decline.\n   - Communicate terms, premium, and any special conditions.\n\n---\n\n## Renewals\n\n- Auto-renewals allowed for clean driving records.\n- Re-underwriting required if risk score worsens by more than 10%.\n- Declination or surcharge possible upon discovery of unreported changes.\n\n---\n\n## Endorsements & Midterm Changes\n\nCommon changes include:\n- Adding/removing drivers\n- Changing address or vehicle\n- Updating lienholder information\n\nAll changes must be documented and re-rated if they materially affect risk.",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "auto"
+  },
+  {
+    "section_id": "05-restaurant-eligibility",
+    "title": "05 Restaurant Eligibility",
+    "filename": "05-restaurant-eligibility.md",
+    "content": "# Section 5: Restaurant Insurance \u2013 Eligibility\n\n## Business Types Accepted\n\n- Dine-in and takeout restaurants\n- Caf\u00e9s and coffee shops\n- Delis and sandwich shops\n- Fast-casual chains\n- Food trucks (with separate endorsement)\n\n## Eligibility Criteria\n\n- Must hold all required local/state food safety permits\n- Seating capacity under 100 for standard program\n- No history of fire within the past 5 years\n- No liquor sales exceeding 30% of gross revenue unless separate liquor liability policy exists\n\n---\n\n## Ineligible Risks\n\n- Nightclubs or bars without food\n- Establishments open past 2 a.m.\n- Restaurants with deep fryer + no fire suppression system\n- Prior history of foodborne illness claims in last 3 years\n- Kitchens with illegal gas or electrical modifications",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "restaurant"
+  },
+  {
+    "section_id": "06-restaurant-coverages",
+    "title": "06 Restaurant Coverages",
+    "filename": "06-restaurant-coverages.md",
+    "content": "# Section 6: Restaurant Insurance \u2013 Property & Equipment Coverage\n\n## Building Coverage\n\nCovers owned structures against fire, windstorm, theft, and other named perils.\n\n## Business Personal Property\n\nIncludes:\n- Furniture and fixtures\n- Kitchen appliances\n- Inventory and food stock\n\n## Equipment Breakdown\n\nProtects against sudden failure of covered kitchen equipment including:\n- Refrigerators, freezers\n- Ovens, fryers, dishwashers\n- HVAC systems\n\n---\n\n## Special Endorsements\n\n- **Spoilage Coverage**: Reimbursement for perishable inventory loss.\n- **Business Income Interruption**: Covers income loss due to a covered event.\n- **Tenant Betterments**: Improvements made to leased kitchens.\n\n## Deductibles\n\nTypically range from $500 to $2,500 depending on exposure and claim history.",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "restaurant"
+  },
+  {
+    "section_id": "07-restaurant-liability",
+    "title": "07 Restaurant Liability",
+    "filename": "07-restaurant-liability.md",
+    "content": "# Section 7: Restaurant Insurance \u2013 Liability Coverage\n\n## General Liability\n\nCovers third-party bodily injury or property damage occurring on premises.\n\n## Foodborne Illness Liability\n\nProtects against claims resulting from:\n- Bacterial contamination (e.g., E. coli, Salmonella)\n- Improper food handling/storage\n- Employee hygiene violations\n\n## Liquor Liability\n\nRequired if alcohol sales > 30% of revenue.\n- Separate policy or endorsement must be in place.\n- Applicant must provide proof of server training (e.g., TIPS certification).\n\n---\n\n## Optional Coverages\n\n- Hired/Non-Owned Auto Liability\n- Employment Practices Liability Insurance (EPLI)\n- Cyber Liability (for POS breaches)\n\n## Claim Examples\n\n- Slip & fall on wet floor \u2013 $12,000 settlement\n- Norovirus outbreak traced to improperly stored seafood \u2013 $50,000\n- Fire damage from unattended fryer \u2013 $90,000",
+    "tags": [
+      "underwriting",
+      "insurance",
+      "manual"
+    ],
+    "product": "restaurant"
+  }
+]

@@ -36,10 +36,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "url",
-              "file"
-            ]
+            "pattern": "^(file|url|vector:[a-zA-Z0-9:_-]+)$"
           },
           "value": {
             "type": "string",
@@ -47,6 +44,12 @@
           }
         }
       }
+    },
+    "regular_prompt": {
+      "type": "string"
+    },
+    "goal_prompt": {
+      "type": "string"
     }
   },
   "additionalProperties": false

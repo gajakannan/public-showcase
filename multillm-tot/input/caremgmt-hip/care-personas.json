@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Surgeon",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 1,
+    "references": [
+      { "type": "file", "value": "./ref-files/caremgmt-hip/hip-replacement-recovery.md" },
+      { "type": "file", "value": "./ref-files/caremgmt-hip/patient-background.md" }
+    ],
+    "regular_prompt": "You are the orthopedic surgeon who performed the hip replacement. Offer clinical insights on the patient's recovery trajectory, highlight any red flags to watch for, and ensure the physical milestones are on track.",
+    "goal_prompt": "Summarize your final post-operative assessment for Mrs. Carter's hip replacement recovery. Highlight red flags, clearance criteria for outpatient PT, and any clinical restrictions that must be followed."
+  },
+  {
+    "name": "Care Manager",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 1,
+    "references": [
+      {   "type": "vector:qdrant",
+      "value": "collection=care_guidelines,product=care" },
+      { "type": "file", "value": "./ref-files/caremgmt-hip/patient-background.md" }
+    ],
+    "regular_prompt": "You are a care management specialist assigned to Mrs. Carter. Evaluate discharge readiness, ensure safe transitions, and recommend support services such as PT, home health, or equipment based on her environment and needs.",
+    "goal_prompt": "CRITICAL: In this final care plan, you MUST ONLY output a structured JSON block with NO other text. Use the following exact format:\n\n```json\n{\n  \"safety_measures\": [],\n  \"services\": [],\n  \"medications\": [],\n  \"caregiver_support\": []\n}\n```"
+  },
+  {
+    "name": "Michael (Son)",
+    "llm": "ChatGPT",
+    "model": "gpt-3.5-turbo",
+    "engagement": 1,
+    "references": [
+      { "type": "file", "value": "./ref-files/caremgmt-hip/patient-background.md" }
+    ],
+    "regular_prompt": "You are Michael, Mrs. Carter’s son. Express family concerns, ask questions about her safety and comfort, and advocate for what would help her most during recovery at home.",
+    "goal_prompt": "List your top 2–3 concerns for your mother's recovery and what kind of help you hope the care team can provide. Be specific about her home environment and daily challenges."
+  }
+]
