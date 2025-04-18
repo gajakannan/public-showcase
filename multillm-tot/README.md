@@ -175,4 +175,6 @@ MIT
 Feel free to submit PRs for:
 - Plug-in architecture for other LLM providers
 
+## 📑 Detailed blog
+https://helloinsurance.substack.com/s/side-quests
 
